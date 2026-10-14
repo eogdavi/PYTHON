@@ -1,0 +1,36 @@
+# Jogos em Python e C++
+
+Pequenos jogos de terminal que fiz para praticar programação, lógica e
+banco de dados.
+
+## Python
+| Jogo | O que pratica |
+|---|---|
+| `python/adivinhe_o_numero.py` | Funções, validação de entrada, **SQLite e consultas SQL** (ranking com `GROUP BY`, `MIN`, `AVG`) |
+| `python/forca.py` | Strings, conjuntos, listas e tratamento de texto |
+| `python/cobrinha.py` | Interface gráfica com `tkinter`, laço de eventos, classes, separação entre regras e tela, e recorde salvo em JSON |
+
+Como rodar (Python 3.8+):
+
+```bash
+python python/adivinhe_o_numero.py
+python python/forca.py
+python python/cobrinha.py
+```
+
+## C++
+| Jogo | O que pratica |
+|---|---|
+| `cpp/jogo_da_velha.cpp` | Arrays, funções, laços e validação de entrada |
+| `cpp/pedra_papel_tesoura.cpp` | `<random>`, `switch`, placar e controle de fluxo |
+
+Como compilar e rodar:
+
+```bash
+g++ -std=c++17 cpp/jogo_da_velha.cpp -o velha && ./velha
+g++ -std=c++17 cpp/pedra_papel_tesoura.cpp -o ppt && ./ppt
+```
+
+## Autor
+David Mota Marques ·
+[LinkedIn](https://www.linkedin.com/in/david-mota-7a07b1338/)
