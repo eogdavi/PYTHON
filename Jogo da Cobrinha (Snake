@@ -1,0 +1,164 @@
+"""Jogo da Cobrinha (Snake) com tkinter, que já vem com o Python.
+
+Controles:
+    Setas ou W/A/S/D  mover
+    Espaço            pausar
+    R                 reiniciar
+O recorde fica salvo no arquivo recorde.json, ao lado do jogo.
+"""
+import json
+import random
+import tkinter as tk
+from pathlib import Path
+
+COLUNAS, LINHAS, CELULA = 20, 20, 25
+VELOCIDADE_INICIAL = 140  # ms entre movimentos (menor = mais rápido)
+VELOCIDADE_MINIMA = 60
+ARQUIVO_RECORDE = Path(__file__).with_name("recorde.json")
+
+DIRECOES = {
+    "Up": (0, -1), "w": (0, -1),
+    "Down": (0, 1), "s": (0, 1),
+    "Left": (-1, 0), "a": (-1, 0),
+    "Right": (1, 0), "d": (1, 0),
+}
+
+
+def carregar_recorde() -> int:
+    try:
+        return int(json.loads(ARQUIVO_RECORDE.read_text())["recorde"])
+    except (OSError, ValueError, KeyError):
+        return 0
+
+
+def salvar_recorde(valor: int) -> None:
+    try:
+        ARQUIVO_RECORDE.write_text(json.dumps({"recorde": valor}))
+    except OSError:
+        pass
+
+
+class Jogo:
+    """Regras do jogo, sem nenhuma parte gráfica."""
+
+    def __init__(self) -> None:
+        self.reiniciar()
+
+    def reiniciar(self) -> None:
+        meio = (COLUNAS // 2, LINHAS // 2)
+        self.cobra = [meio, (meio[0] - 1, meio[1]), (meio[0] - 2, meio[1])]
+        self.direcao = (1, 0)
+        self.proxima_direcao = self.direcao
+        self.pontos = 0
+        self.fim = False
+        self.comida = self.sortear_comida()
+
+    def sortear_comida(self):
+        livres = [(x, y) for x in range(COLUNAS) for y in range(LINHAS)
+                  if (x, y) not in self.cobra]
+        return random.choice(livres) if livres else None
+
+    def mudar_direcao(self, nova) -> None:
+        # Impede de virar 180 graus e bater no próprio corpo.
+        if (nova[0] + self.direcao[0], nova[1] + self.direcao[1]) != (0, 0):
+            self.proxima_direcao = nova
+
+    def passo(self) -> None:
+        if self.fim:
+            return
+        self.direcao = self.proxima_direcao
+        x, y = self.cobra[0]
+        nova_cabeca = (x + self.direcao[0], y + self.direcao[1])
+
+        bateu_parede = not (0 <= nova_cabeca[0] < COLUNAS and 0 <= nova_cabeca[1] < LINHAS)
+        come = nova_cabeca == self.comida
+        corpo = self.cobra if come else self.cobra[:-1]  # a cauda sai da frente
+        if bateu_parede or nova_cabeca in corpo:
+            self.fim = True
+            return
+
+        self.cobra.insert(0, nova_cabeca)
+        if come:
+            self.pontos += 1
+            self.comida = self.sortear_comida()
+            if self.comida is None:  # tabuleiro cheio: venceu
+                self.fim = True
+        else:
+            self.cobra.pop()
+
+
+class App:
+    def __init__(self, raiz: tk.Tk) -> None:
+        self.raiz = raiz
+        raiz.title("Cobrinha")
+        raiz.resizable(False, False)
+
+        self.jogo = Jogo()
+        self.recorde = carregar_recorde()
+        self.pausado = False
+
+        self.placar = tk.Label(raiz, font=("Arial", 14), pady=6)
+        self.placar.pack()
+        self.tela = tk.Canvas(raiz, width=COLUNAS * CELULA, height=LINHAS * CELULA,
+                              bg="#1e1e1e", highlightthickness=0)
+        self.tela.pack()
+
+        raiz.bind("<Key>", self.tecla)
+        self.desenhar()
+        self.raiz.after(VELOCIDADE_INICIAL, self.ciclo)
+
+    def tecla(self, evento: tk.Event) -> None:
+        chave = evento.keysym if evento.keysym in DIRECOES else evento.keysym.lower()
+        if chave in DIRECOES:
+            self.jogo.mudar_direcao(DIRECOES[chave])
+        elif chave == "space" and not self.jogo.fim:
+            self.pausado = not self.pausado
+            self.desenhar()
+        elif chave == "r":
+            self.jogo.reiniciar()
+            self.pausado = False
+            self.desenhar()
+
+    def ciclo(self) -> None:
+        if not self.pausado and not self.jogo.fim:
+            self.jogo.passo()
+            if self.jogo.pontos > self.recorde:
+                self.recorde = self.jogo.pontos
+                salvar_recorde(self.recorde)
+            self.desenhar()
+        # A cobra acelera a cada 3 pontos, até o limite.
+        atraso = max(VELOCIDADE_MINIMA, VELOCIDADE_INICIAL - 10 * (self.jogo.pontos // 3))
+        self.raiz.after(atraso, self.ciclo)
+
+    def quadrado(self, pos, cor) -> None:
+        x, y = pos
+        self.tela.create_rectangle(x * CELULA + 1, y * CELULA + 1,
+                                   (x + 1) * CELULA - 1, (y + 1) * CELULA - 1,
+                                   fill=cor, outline="")
+
+    def texto(self, msg: str) -> None:
+        self.tela.create_text(COLUNAS * CELULA // 2, LINHAS * CELULA // 2,
+                              text=msg, fill="white", font=("Arial", 18, "bold"),
+                              justify="center")
+
+    def desenhar(self) -> None:
+        self.tela.delete("all")
+        if self.jogo.comida:
+            self.quadrado(self.jogo.comida, "#e74c3c")
+        for i, parte in enumerate(self.jogo.cobra):
+            self.quadrado(parte, "#2ecc71" if i else "#27ae60")
+        self.placar.config(text=f"Pontos: {self.jogo.pontos}   Recorde: {self.recorde}")
+        if self.jogo.fim:
+            self.texto("Fim de jogo!\nPressione R para reiniciar")
+        elif self.pausado:
+            self.texto("Pausado\nPressione Espaço")
+
+
+def main() -> None:
+    raiz = tk.Tk()
+    App(raiz)
+    raiz.mainloop()
+
+
+if __name__ == "__main__":
+    main()
